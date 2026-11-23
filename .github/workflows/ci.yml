@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend core deps
+        run: pip install -r backend/core/requirements.txt
+      - name: Backend test suite
+        working-directory: backend/core
+        run: python -m pytest tests -v
+
+  evenhub-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: evenhub/package-lock.json
+      - name: Install
+        working-directory: evenhub
+        run: npm ci
+      - name: Build (tsc + vite)
+        working-directory: evenhub
+        run: npm run build
+      - name: Pack .ehpk (best effort)
+        working-directory: evenhub
+        run: |
+          npm install -g @evenrealities/evenhub-cli || true
+          if command -v evenhub >/dev/null 2>&1; then
+            evenhub pack app.json dist -o understand-me.ehpk --sdk-ver 0.0.14
+          else
+            echo "::notice::evenhub CLI unavailable in runner — skipping pack (build already verified)"
+          fi
