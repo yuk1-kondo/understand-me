@@ -13,3 +13,7 @@ discord-ext-voice-recv @ git+https://github.com/imayhaveborkedit/discord-ext-voi
 
 # Python bindings for the DAVE protocol (MLS-based E2EE crypto).
 davey>=0.1.0
+
+# Real local STT (STT_PROVIDER=whisper)
+faster-whisper>=1.0
+numpy>=1.26

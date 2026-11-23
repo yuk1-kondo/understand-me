@@ -39,6 +39,17 @@ import aiohttp
 import discord
 from discord.ext import voice_recv
 
+# discord.py does not auto-find libopus on Apple Silicon Homebrew installs;
+# without it every received packet dies with OpusNotLoaded. Load it explicitly
+# from the standard locations before any decoder is created.
+if not discord.opus.is_loaded():
+    for _opus_path in ("/opt/homebrew/lib/libopus.0.dylib", "/usr/local/lib/libopus.0.dylib", "libopus.0.dylib"):
+        try:
+            discord.opus.load_opus(_opus_path)
+            break
+        except Exception:
+            continue
+
 from stt_interface import SpeechToText, get_stt
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -196,6 +207,37 @@ class ReceiverBot(discord.Client):
 
     def _handle_utterance(self, speaker: str, pcm: bytes) -> None:
         """Segmenter callback (sync): transcribe, then post asynchronously."""
+        # Debug: log the utterance's duration and peak/RMS level so silent or
+        # near-silent captures (which make Whisper hallucinate) are visible.
+        try:
+            import struct
+
+            samples = struct.unpack(f"<{len(pcm) // 2}h", pcm)
+            if samples:
+                peak = max(abs(s) for s in samples)
+                rms = (sum(s * s for s in samples) / len(samples)) ** 0.5
+                log.info(
+                    "Utterance from %s: %.2fs peak=%d rms=%.0f",
+                    speaker,
+                    len(pcm) / BYTES_PER_SECOND,
+                    peak,
+                    rms,
+                )
+        except Exception:
+            pass
+        if os.environ.get("UM_DEBUG_DUMP"):
+            try:
+                import wave
+
+                path = f"/tmp/utterance-{int(time.time())}.wav"
+                with wave.open(path, "wb") as wf:
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(2)
+                    wf.setframerate(SAMPLE_RATE)
+                    wf.writeframes(pcm)
+                log.info("Dumped utterance WAV: %s", path)
+            except Exception:
+                log.exception("WAV dump failed")
         try:
             text = self._stt.transcribe(pcm, SAMPLE_RATE, CHANNELS, speaker)
         except Exception:

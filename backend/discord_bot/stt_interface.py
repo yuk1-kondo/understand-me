@@ -57,6 +57,40 @@ class FakeSpeechToText(SpeechToText):
         return text
 
 
+class WhisperLocalSpeechToText(SpeechToText):
+    """Real STT: faster-whisper running locally (CPU, int8).
+
+    Model from WHISPER_MODEL (default ``large-v3-turbo``). PCM arrives as
+    48 kHz stereo s16le (post-DAVE decode); it is downmixed and decimated to
+    the 16 kHz mono float32 Whisper expects. The model loads lazily on first
+    use so importing this module stays cheap.
+    """
+
+    def __init__(self, model_name: str | None = None) -> None:
+        self._model_name = model_name or os.environ.get("WHISPER_MODEL", "large-v3-turbo")
+        self._model = None
+
+    def _load(self):
+        if self._model is None:
+            from faster_whisper import WhisperModel
+
+            self._model = WhisperModel(self._model_name, device="cpu", compute_type="int8")
+        return self._model
+
+    def transcribe(self, pcm: bytes, sample_rate: int, channels: int, speaker: str) -> str:
+        import numpy as np
+
+        audio = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+        if channels > 1:
+            audio = audio.reshape(-1, channels).mean(axis=1)
+        if sample_rate != 16000:
+            factor = sample_rate // 16000
+            n = (len(audio) // factor) * factor
+            audio = audio[:n].reshape(-1, factor).mean(axis=1)
+        segments, _info = self._load().transcribe(audio, language="ja", beam_size=1)
+        return "".join(seg.text for seg in segments).strip()
+
+
 class StubSpeechToText(SpeechToText):
     """Placeholder for the real STT provider — not yet implemented."""
 
@@ -72,6 +106,8 @@ def get_stt() -> SpeechToText:
     provider = os.environ.get("STT_PROVIDER", "fake").lower()
     if provider == "fake":
         return FakeSpeechToText()
+    if provider == "whisper":
+        return WhisperLocalSpeechToText()
     if provider == "stub":
         return StubSpeechToText()
-    raise ValueError(f"Unknown STT_PROVIDER: {provider!r} (expected 'fake' or 'stub')")
+    raise ValueError(f"Unknown STT_PROVIDER: {provider!r} (expected 'fake', 'whisper' or 'stub')")

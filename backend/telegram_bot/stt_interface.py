@@ -40,6 +40,36 @@ class FakeSTTProvider:
         return FAKE_TRANSCRIPT
 
 
+class WhisperFileSTTProvider:
+    """Real STT: faster-whisper (local, CPU int8) on the audio file.
+
+    Telegram voice notes arrive as .ogg/Opus files; faster-whisper decodes
+    them via PyAV, so no format conversion is needed. Model from
+    WHISPER_MODEL (default ``large-v3-turbo``), loaded lazily once and
+    reused. The blocking transcribe runs in a worker thread.
+    """
+
+    def __init__(self, model_name: str | None = None) -> None:
+        self._model_name = model_name or os.environ.get("WHISPER_MODEL", "large-v3-turbo")
+        self._model = None
+
+    def _load(self):
+        if self._model is None:
+            from faster_whisper import WhisperModel
+
+            self._model = WhisperModel(self._model_name, device="cpu", compute_type="int8")
+        return self._model
+
+    def _transcribe_sync(self, audio_path: str) -> str:
+        segments, _info = self._load().transcribe(audio_path, language="ja", beam_size=1)
+        return "".join(seg.text for seg in segments).strip()
+
+    async def transcribe(self, audio_path: str) -> str:
+        import asyncio
+
+        return await asyncio.to_thread(self._transcribe_sync, audio_path)
+
+
 class UnconfiguredSTTProvider:
     """Placeholder for the real provider. Fails loudly instead of
     silently returning wrong text."""
@@ -55,6 +85,8 @@ def get_stt_provider() -> STTProvider:
     name = os.environ.get("STT_PROVIDER", "fake").lower()
     if name == "fake":
         return FakeSTTProvider()
+    if name == "whisper":
+        return WhisperFileSTTProvider()
     if name == "real":
         return UnconfiguredSTTProvider()
-    raise ValueError(f"Unknown STT_PROVIDER: {name!r} (expected 'fake' or 'real')")
+    raise ValueError(f"Unknown STT_PROVIDER: {name!r} (expected 'fake', 'whisper' or 'real')")
