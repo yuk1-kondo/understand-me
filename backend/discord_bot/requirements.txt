@@ -1,0 +1,15 @@
+# Understand Me — Discord voice receiver dependencies.
+# Pin to reality, not releases: DAVE (Discord's mandatory E2EE for voice,
+# enforced 2026-03-02) broke every stable voice-receive stack. The combo
+# below is the one with published, working field reports.
+
+# discord.py with DAVE support (sending + handshake) and voice extras (PyNaCl, opus).
+discord.py[voice]>=2.7.1
+
+# Voice *receiving* with DAVE decryption exists ONLY in this unmerged PR.
+# The stable release of discord-ext-voice-recv does not know DAVE exists and
+# fails with "OpusError: corrupted stream" on every packet.
+discord-ext-voice-recv @ git+https://github.com/imayhaveborkedit/discord-ext-voice-recv.git@refs/pull/54/head
+
+# Python bindings for the DAVE protocol (MLS-based E2EE crypto).
+davey>=0.1.0

@@ -1,0 +1,16 @@
+{
+  "package_id": "com.hackathon.understandme",
+  "edition": "202601",
+  "name": "Understand Me",
+  "version": "0.1.0",
+  "min_sdk_version": "0.0.14",
+  "entrypoint": "index.html",
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "Polls the Understand Me backend for live captions and checksum cards, and posts the wearer's confirmation back.",
+      "whitelist": ["http://localhost:8000"]
+    }
+  ],
+  "supported_languages": ["en", "ja"]
+}

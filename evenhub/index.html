@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Understand Me — Even Hub</title>
+    <style>
+      /* The glasses never see this page — it runs in the phone/simulator
+         WebView and only drives the display via the SDK bridge. A small
+         status line is kept for debugging (webview inspector / screenshot). */
+      body { background: #000; color: #00ff9d; font: 12px/1.4 monospace; margin: 0; padding: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="app-status">Understand Me — booting…</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

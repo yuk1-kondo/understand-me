@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=576, height=288, initial-scale=1">
+<title>Understand Me — Even G2</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="display">
+    <!-- ===== Caption view ===== -->
+    <section id="view-captions" class="view active">
+      <header class="bar">
+        <span class="title">Understand Me</span>
+        <span id="conn" class="conn">DEMO</span>
+      </header>
+      <div id="caption-list"></div>
+      <div id="checksum-alert" class="alert hidden">▲ 確認カードがあります（Tab）</div>
+      <footer class="hint">Tab：確認カードへ</footer>
+    </section>
+
+    <!-- ===== Checksum card view ===== -->
+    <section id="view-checksum" class="view">
+      <header class="bar">
+        <span class="title">理解チェック</span>
+        <span id="checksum-state" class="conn">—</span>
+      </header>
+      <div id="checksum-body">
+        <div id="checksum-empty" class="empty">確認が必要な項目はありません</div>
+        <div id="checksum-card" class="card hidden">
+          <div class="slot" id="cs-slot">期限</div>
+          <div class="row"><span class="label">指示</span><span class="val" id="cs-original">木曜日</span></div>
+          <div class="row heard"><span class="label">復唱</span><span class="val" id="cs-heard">金曜日</span></div>
+          <div class="choices">
+            <div class="choice" id="choice-confirm">確認する</div>
+            <div class="choice" id="choice-send">正しい内容を送る</div>
+          </div>
+        </div>
+        <div id="checksum-done" class="empty hidden">送信しました ✓</div>
+      </div>
+      <footer class="hint">←→：選択　Enter：決定　Tab：字幕へ</footer>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
