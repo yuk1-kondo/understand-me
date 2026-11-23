@@ -29,9 +29,9 @@ see `checksum.py`. STT is behind an interface in `stt.py`; set
 | POST | `/checksum/compare` | `{original_text, paraphrase_text}` → list of diffs `[{slot, original, paraphrase}]` (empty = match); a non-empty result also becomes the pending card |
 | GET | `/checksum/latest` | pending checksum card `{id, slot, original, heard, diffs}` for the glasses app, or `null` |
 | POST | `/checksum/respond` | `{id, action: "confirm" \| "send_corrected"}` → records the wearer's response and clears the card |
-
-Auto-checksum: an instruction-like caption (slots found) from a different speaker than the last instruction is treated as its paraphrase; any slot mismatch automatically becomes the pending card at `/checksum/latest`.
 | GET | `/health` | `{"status": "ok"}` |
+
+Auto-checksum: an instruction-like caption (slots found) from a different speaker than the last instruction is treated as its paraphrase; any slot mismatch automatically becomes the pending card at `/checksum/latest`, and the instruction is consumed so the next instruction-like utterance starts a fresh comparison.
 
 Captions always have the shape `{speaker: str, text: str, ts: ISO string}`.
 

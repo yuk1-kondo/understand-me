@@ -80,9 +80,10 @@ class WhisperLocalSpeechToText(SpeechToText):
     def transcribe(self, pcm: bytes, sample_rate: int, channels: int, speaker: str) -> str:
         import numpy as np
 
-        audio = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+        audio = np.frombuffer(pcm[: len(pcm) - len(pcm) % 2], dtype=np.int16).astype(np.float32) / 32768.0
         if channels > 1:
-            audio = audio.reshape(-1, channels).mean(axis=1)
+            usable = len(audio) // channels * channels
+            audio = audio[:usable].reshape(-1, channels).mean(axis=1)
         if sample_rate != 16000:
             factor = sample_rate // 16000
             n = (len(audio) // factor) * factor

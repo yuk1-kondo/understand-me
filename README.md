@@ -18,52 +18,54 @@ Live captions solved "can I read what was said?" They did not solve "did I under
 
 ## How it works
 
-```
-Discord voice channel ── bot receives audio (DAVE-decrypted PCM)
-                              │  speech-to-text
-Telegram voice message ───────┤
-                              ▼
-                     backend/core (FastAPI)
-                     caption queue ──► Even Hub app polls /captions
-                     checksum engine: extract slots from the instruction,
-                     compare with the listener's paraphrase,
-                     mismatch ──► pending card at /checksum/latest
-                              │
-                              ▼
-                     Even Hub app (evenhub/)
-                     captions as text containers on the 576×288 canvas;
-                     checksum card as a native list — tap to confirm
-                     or send the corrected version back (POST /checksum/respond)
-```
-
-- `evenhub/` — the submitted Even Hub app (EvenAppBridge container UI, `.ehpk`)
-- `app/` — the same UI as a plain browser demo (dummy data, no tooling needed)
-- `backend/core/` — caption queue, checksum engine (rule-based slot extraction; a Claude extractor can be swapped in behind the same interface), STT interface
-- `backend/discord_bot/` — joins a voice channel and receives audio (token-pluggable), plus a mock receiver for token-free demos
-- `backend/telegram_bot/` — voice-message tier running the same checksum loop
+- `evenhub/` — the real Even Hub app (verified in the official simulator): caption view + checksum card built from SDK text/list containers
+- `app/` — browser fallback demo of the same UI (no build, dummy data when the backend is down)
+- `backend/core/` — FastAPI caption queue (REST + WebSocket) and the rule-based checksum engine (slot extraction → diff → pending card), with tests
+- `backend/discord_bot/` — joins a Discord voice channel, receives DAVE-decrypted audio (discord-ext-voice-recv), segments per speaker, transcribes locally with faster-whisper, posts captions
+- `backend/telegram_bot/` — Telegram voice-message tier running the same checksum loop
+- `scripts/display_check.py` — local end-to-end display regression check (build → backend → simulator → framebuffer assertions; see `docs/DISPLAY_CHECK.md`)
 
 Claude is used only as an internal AI component (slot extraction / comparison). The only external services integrated are Discord and Telegram, per Track 01.
 
 ## Setup
 
-Prerequisites: Python 3.12, Node.js (for the Even Hub tooling).
+Backend (no API keys needed — extraction is rule-based):
 
-1. Backend core:
-   ```
-   cd backend/core
-   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-   .venv/bin/uvicorn main:app --port 8000
-   ```
-   Verify: `curl http://localhost:8000/health` → `{"status":"ok"}`. Tests: `.venv/bin/python -m pytest`.
-2. Glasses app (simulator): see `evenhub/README.md` — in short, `npm install`, `npm run build`, `evenhub pack app.json dist -o understand-me.ehpk`, then load the `.ehpk` in the Even Hub simulator.
-3. Discord tier (optional, needs your own bot): see `backend/discord_bot/README.md`. Tokens are read from environment variables only (see `.env.example`); never commit them.
-4. Telegram tier (optional): see `backend/telegram_bot/README.md`.
+```bash
+cd backend/core && python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --port 8000
+pytest            # 15 tests
+```
 
-Quick end-to-end check without any tokens: start the backend, run `backend/discord_bot/mock_receiver.py` to feed scripted captions, then post an instruction and a paraphrase as two speakers — the checksum card appears at `GET /checksum/latest`.
+Even Hub app + simulator (needs `evenhub-simulator` + `evenhub` CLI from
+`@evenrealities/*` npm packages, and the display-check ports free):
+
+```bash
+cd evenhub && npm install && npm run build
+(cd dist && python3 -m http.server 5173 &)
+evenhub-simulator http://localhost:5173 --automation-port 9898
+python3 ../scripts/display_check.py   # full local regression check → PASS
+```
+
+Input tiers (tokens via env vars only — see `.env.example`; never commit `.env`):
+
+- Discord: `backend/discord_bot/` — `pip install -r requirements.txt` (pins
+  `davey>=0.1,<0.2` and the rdphillips7 voice-recv fork; see
+  `docs/DISCORD_SPIKE.md` for why), then `DISCORD_BOT_TOKEN=... DISCORD_CHANNEL_ID=... STT_PROVIDER=whisper python receiver.py`. `mock_receiver.py` demos the caption path with no token.
+- Telegram: `backend/telegram_bot/` — `TELEGRAM_BOT_TOKEN=... STT_PROVIDER=whisper python bot.py`.
+
+STT is real: `STT_PROVIDER=whisper` runs faster-whisper `large-v3-turbo`
+locally on both bots (`WHISPER_MODEL` overrides; `STT_PROVIDER=fake` gives
+canned text for demos).
+
+CI: `.github/workflows/ci.yml` runs the backend tests and the evenhub
+build on every push. The glasses framebuffer check stays local — it needs
+the macOS simulator.
 
 ## Demo
 
-Demo script: `docs/DEMO_SCRIPT.md`. Video: _to be added before submission (≤ 3 min, recorded in the Even Hub simulator)._
+_TODO: link to the demo video (≤ 3 min)._
 
 ## What existed before the official build start (hackathon declaration)
 
@@ -80,10 +82,9 @@ Created on Nov 23 before 17:00 JST (declared honestly as pre-start work):
 - Discord voice receiver written to the public DAVE recipe (token-pluggable; not yet connected to Discord) plus a mock receiver for token-free demos
 - Telegram bot tier (voice message → transcript → checksum → confirm/correct flow; not yet connected)
 - Glasses-app front-end scaffold (caption view + checksum card, 576×288, with built-in dummy data)
-- Even Hub app package (`evenhub/`): the front-end ported to the official EvenAppBridge container model, built into `understand-me.ehpk` and verified loading in the official Even Hub simulator (SDK pinned to 0.0.14 for simulator 0.9.5 compatibility)
 
 Everything not listed above was created during the build week (Nov 23–29, 2026).
 
 ## License
 
-MIT
+_TODO._

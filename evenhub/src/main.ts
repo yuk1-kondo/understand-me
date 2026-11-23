@@ -21,7 +21,9 @@ import {
   type EvenHubEvent,
 } from '@evenrealities/even_hub_sdk'
 
-const BACKEND = 'http://localhost:8000'
+// Backend base URL — overridable at build time (e.g. the display-check
+// script builds with VITE_BACKEND_URL=http://localhost:8001).
+const BACKEND = (import.meta.env.VITE_BACKEND_URL as string | undefined) || 'http://localhost:8000'
 const POLL_MS = 2000
 
 /* ---------------- dummy data (standalone demo) ---------------- */

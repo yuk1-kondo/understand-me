@@ -1,19 +1,26 @@
 # Understand Me — Discord voice receiver dependencies.
 # Pin to reality, not releases: DAVE (Discord's mandatory E2EE for voice,
 # enforced 2026-03-02) broke every stable voice-receive stack. The combo
-# below is the one with published, working field reports.
+# below is what today's live test actually ran on.
 
 # discord.py with DAVE support (sending + handshake) and voice extras (PyNaCl, opus).
 discord.py[voice]>=2.7.1
 
-# Voice *receiving* with DAVE decryption exists ONLY in this unmerged PR.
-# The stable release of discord-ext-voice-recv does not know DAVE exists and
-# fails with "OpusError: corrupted stream" on every packet.
-discord-ext-voice-recv @ git+https://github.com/imayhaveborkedit/discord-ext-voice-recv.git@refs/pull/54/head
+# Voice *receiving* with DAVE decryption. Upstream PR #54
+# (imayhaveborkedit/discord-ext-voice-recv) has a double-decryption bug
+# found in live testing on 2026-11-23 — frames were being decrypted twice
+# and arrived as noise. The rdphillips7 fork carries the corrected path.
+discord-ext-voice-recv @ git+https://github.com/rdphillips7/discord-ext-voice-recv.git@e0cc062ee2fe10311ffacdd4a4d00de707d6b1a7
 
 # Python bindings for the DAVE protocol (MLS-based E2EE crypto).
-davey>=0.1.0
+# davey 0.2.0 broke the session (transition/key API change, live-tested
+# 2026-11-23); stay on the 0.1 series until the API is re-verified.
+davey>=0.1,<0.2
 
-# Real local STT (STT_PROVIDER=whisper)
+# Real local STT (STT_PROVIDER=whisper): faster-whisper on CPU.
+# numpy is used directly for PCM downmix/resample in stt_interface.py.
 faster-whisper>=1.0
-numpy>=1.26
+numpy>=1.24
+
+# Imported directly by receiver.py (also pulled in transitively by discord.py).
+aiohttp>=3.9

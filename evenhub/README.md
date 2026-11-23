@@ -72,7 +72,10 @@ evenhub/
 
 `src/main.ts` is a line-by-line port of `app/app.js`: same dummy data, same
 poll timings (`POLL_MS = 2000`, checksum offset `+700`, first checksum poll at
-`1200 ms`), same `BACKEND` constant (`http://localhost:8000`), same endpoints:
+`1200 ms`), same endpoints. The backend URL defaults to
+`http://localhost:8000` and can be overridden at build time:
+`VITE_BACKEND_URL=http://<host>:<port> npm run build` (used by
+`scripts/display_check.py` to point a build at a test backend):
 
 - `GET /captions` — accepts `{ captions: [...] }` **and** the bare array the
   current backend actually returns (`backend/core/main.py` returns `store.all()`,

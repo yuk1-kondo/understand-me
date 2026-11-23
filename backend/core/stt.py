@@ -1,6 +1,10 @@
 """Speech-to-text interface.
 
-Real STT (Whisper, a cloud API, …) is plugged in later. Until then:
+The core service itself never touches audio — STT lives in the input
+tiers (working faster-whisper providers are in backend/discord_bot and
+backend/telegram_bot, selected with STT_PROVIDER=whisper). This module
+keeps the shared interface plus the canned-text fake used by tests:
+
 - `transcribe()` is the production entry point and raises
   NotImplementedError so a missing provider fails loudly, never silently.
 - `FakeSTT` / `fake_transcribe()` return fixed text so the rest of the
@@ -50,7 +54,13 @@ def get_stt() -> SpeechToText:
     provider = os.environ.get("STT_PROVIDER", "").lower()
     if provider == "fake":
         return FakeSTT()
-    return UnconfiguredSTT()
+    if provider in ("", "stub"):
+        return UnconfiguredSTT()
+    raise ValueError(
+        f"Unknown STT_PROVIDER: {provider!r} (expected 'fake' or 'stub'; "
+        "the working 'whisper' providers live in backend/discord_bot "
+        "and backend/telegram_bot)"
+    )
 
 
 def transcribe(audio_bytes: bytes) -> str:

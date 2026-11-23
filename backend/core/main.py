@@ -9,6 +9,7 @@ Run:
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -83,6 +84,11 @@ def _auto_checksum(speaker: str, text: str) -> None:
         ]
         if diffs:
             _set_card_from_diffs(diffs)
+            # The mismatch is now owned by the card flow, so the instruction
+            # is consumed: the next instruction-like utterance starts a fresh
+            # comparison instead of being diffed against this stale one
+            # (previously the paraphrasing speaker could never instruct).
+            last_instruction = None
         return  # a paraphrase never replaces the instruction it refers to
     last_instruction = {"speaker": speaker, "text": text, "slots": slots}
 
@@ -169,7 +175,7 @@ async def get_checksum_latest() -> dict | None:
 
 class RespondIn(BaseModel):
     id: str
-    action: str  # "confirm" | "send_corrected"
+    action: Literal["confirm", "send_corrected"]
 
 
 @app.post("/checksum/respond")

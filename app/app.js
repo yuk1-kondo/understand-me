@@ -90,9 +90,10 @@ async function fetchJSON(path) {
 async function pollCaptions() {
   try {
     const data = await fetchJSON("/captions");
-    // Expected: { captions: [{ speaker, text }, ...] }
-    if (Array.isArray(data.captions)) {
-      captions = data.captions;
+    // Contract: { captions: [...] }; the current backend also serves a bare array.
+    const list = Array.isArray(data.captions) ? data.captions : Array.isArray(data) ? data : null;
+    if (list) {
+      captions = list;
       backendLive = true;
     }
   } catch (_) {
@@ -116,6 +117,7 @@ async function pollChecksum() {
       selectedChoice = 0;
     } else if (!cs) {
       checksum = null;
+      checksumHandled = false;
     }
     backendLive = true;
   } catch (_) {

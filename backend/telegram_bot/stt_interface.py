@@ -81,12 +81,21 @@ class UnconfiguredSTTProvider:
         )
 
 
+# Providers are cached per name: get_stt_provider() is called on every
+# voice note, and WhisperFileSTTProvider holds a multi-GB model that must
+# not reload per message.
+_PROVIDERS: dict[str, STTProvider] = {}
+
+
 def get_stt_provider() -> STTProvider:
     name = os.environ.get("STT_PROVIDER", "fake").lower()
-    if name == "fake":
-        return FakeSTTProvider()
-    if name == "whisper":
-        return WhisperFileSTTProvider()
-    if name == "real":
-        return UnconfiguredSTTProvider()
-    raise ValueError(f"Unknown STT_PROVIDER: {name!r} (expected 'fake', 'whisper' or 'real')")
+    if name not in _PROVIDERS:
+        if name == "fake":
+            _PROVIDERS[name] = FakeSTTProvider()
+        elif name == "whisper":
+            _PROVIDERS[name] = WhisperFileSTTProvider()
+        elif name == "real":
+            _PROVIDERS[name] = UnconfiguredSTTProvider()
+        else:
+            raise ValueError(f"Unknown STT_PROVIDER: {name!r} (expected 'fake', 'whisper' or 'real')")
+    return _PROVIDERS[name]

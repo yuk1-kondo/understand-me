@@ -15,7 +15,8 @@ Flow (mirrors the Discord main line, but over Telegram voice notes):
 Configuration is via environment variables only (see .env.example):
   TELEGRAM_BOT_TOKEN  BotFather token. Required; never hardcode.
   BACKEND_URL         Core backend base URL (default http://localhost:8000)
-  STT_PROVIDER        "fake" (default) or "real" — see stt_interface.py
+  STT_PROVIDER        "fake" (default), "whisper" (local faster-whisper)
+                      or "real" (stub) — see stt_interface.py
 
 Run:  python bot.py
 """
@@ -83,10 +84,10 @@ async def post_caption(speaker: str, text: str) -> None:
 async def extract_slots(text: str) -> dict[str, Any]:
     """Ask the backend to extract checksum slots from an instruction.
 
-    Expected response shape:
-      {"slots": {"deadline": ..., "quantity": ..., "task": ...,
-                 "destination": ...}}
-    Missing/empty slots are simply absent from the dict.
+    The backend returns the flat dict
+      {"deadline": ..., "quantity": ..., "task": ..., "destination": ...}
+    with nulls for unfound slots; an older {"slots": {...}} wrapper is
+    also accepted. Missing/empty slots are dropped from the result.
     """
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -95,7 +96,8 @@ async def extract_slots(text: str) -> dict[str, Any]:
         )
         resp.raise_for_status()
         data = resp.json()
-    return data.get("slots") or {}
+    slots = data.get("slots") if isinstance(data.get("slots"), dict) else data
+    return {k: v for k, v in slots.items() if v}
 
 
 # ---------------------------------------------------------------------------

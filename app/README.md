@@ -36,7 +36,7 @@ The stage is exactly the G2 frame (576×288), monochrome green on black.
 
 Backend URL is configured at the top of `app.js` (`BACKEND`, default `http://localhost:8000`).
 
-- `GET /captions` → `{ "captions": [{ "speaker": "田中さん", "text": "..." }, ...] }`
+- `GET /captions` → the backend currently returns a **bare array** `[{ "speaker": "田中さん", "text": "...", "ts": "..." }, ...]`; `app.js` also accepts the `{ "captions": [...] }` wrapper
 - `GET /checksum/latest` → `{ "id": "x", "slot": "期限", "original": "木曜日", "heard": "金曜日" }` or `null`
 - `POST /checksum/respond` ← `{ "id": "x", "action": "confirm" | "send_corrected" }`
 

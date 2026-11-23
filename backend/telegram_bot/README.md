@@ -36,7 +36,7 @@ being confirmed at a time.
 |---|---|---|---|
 | `TELEGRAM_BOT_TOKEN` | yes | — | BotFather token |
 | `BACKEND_URL` | no | `http://localhost:8000` | Core backend (captions + checksum) |
-| `STT_PROVIDER` | no | `fake` | `fake` = fixed Japanese sample text (testing/demo); `real` = production provider stub in `stt_interface.py` (raises until implemented) |
+| `STT_PROVIDER` | no | `fake` | `fake` = fixed Japanese sample text (testing/demo); `whisper` = real local STT (faster-whisper, `WHISPER_MODEL` selects size, default `large-v3-turbo`); `real` = production provider stub in `stt_interface.py` (raises until implemented) |
 
 See `../../.env.example` for the full list across components.
 
@@ -63,4 +63,4 @@ checksum re-run.
 
 - `bot.py` — handlers (voice / text / callback), backend calls, entry point
 - `stt_interface.py` — STT provider interface, fake provider, real-provider stub
-- `requirements.txt` — `python-telegram-bot`, `httpx`
+- `requirements.txt` — `python-telegram-bot`, `httpx`, `faster-whisper`

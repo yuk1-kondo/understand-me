@@ -16,7 +16,7 @@ this repository — it lives in the Secure Vault.
 | File | Role |
 |---|---|
 | `receiver.py` | The bot: voice receive → per-speaker segmentation → STT → caption POST |
-| `stt_interface.py` | STT behind an interface (`SpeechToText`), with a fake (canned Japanese) and a stub for the real provider |
+| `stt_interface.py` | STT behind an interface (`SpeechToText`): `whisper` (local faster-whisper), a fake (canned Japanese), and a stub |
 | `mock_receiver.py` | Token-free stand-in: posts a scripted two-speaker Japanese conversation into the same `/captions` path |
 
 ## Setup
@@ -28,10 +28,12 @@ pip install -r requirements.txt
 ```
 
 Dependencies are pinned to what actually works after Discord made DAVE
-(E2EE) mandatory on 2026-03-02: `discord.py[voice]>=2.7.1`, the
-`davey` crypto bindings, and `discord-ext-voice-recv` from the
-**unmerged PR #54** — the stable release cannot decrypt DAVE packets.
-See `docs/DISCORD_SPIKE.md` in the repo root docs for sources.
+(E2EE) mandatory on 2026-03-02: `discord.py[voice]>=2.7.1`, `davey>=0.1,<0.2`
+(0.2.0 breaks the DAVE session — verified live 2026-11-23), and
+`discord-ext-voice-recv` from the **rdphillips7 fork** — upstream PR #54
+has a double-decryption bug. `faster-whisper` is included for
+`STT_PROVIDER=whisper` (local STT). See `docs/DISCORD_SPIKE.md` for sources
+and today's live-test findings.
 
 Environment (see the repo-root `.env.example`):
 
@@ -39,7 +41,7 @@ Environment (see the repo-root `.env.example`):
 export DISCORD_BOT_TOKEN=...      # from the Secure Vault, at run time only
 export DISCORD_CHANNEL_ID=...     # numeric ID of the test voice channel
 export BACKEND_URL=http://localhost:8000
-export STT_PROVIDER=fake          # 'fake' (default) or 'stub'
+export STT_PROVIDER=whisper       # 'whisper' (real local STT), 'fake' (default), or 'stub'
 ```
 
 ## Run the real receiver
@@ -74,8 +76,9 @@ checksum test instruction: 「木曜日までに3部、教務部へ提出」.
    so the library does DAVE decrypt + Opus decode internally. Raw
    frames are still encrypted and fail with
    `OpusError: corrupted stream`.
-4. **Pin PR #54.** The DAVE receive support is not in any release;
-   "just upgrade the library" does not work yet.
+4. **Pin the rdphillips7 fork + `davey<0.2`.** Upstream PR #54
+   double-decrypts frames (live-tested 2026-11-23), and davey 0.2.0
+   breaks the session — "just upgrade the library" does not work.
 5. **Never let a bad packet kill the loop.** All sink callbacks are
    wrapped defensively; bad packets are logged and skipped.
 6. **py-cord does not support DAVE** (connections are refused with

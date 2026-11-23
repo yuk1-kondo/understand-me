@@ -3,6 +3,14 @@
 目的: DAVE（E2EE）必須化後の Discord ボイスチャンネルで、Bot が他人の発話音声を受信し、話者別に PCM を得られることを実証する。
 背景: Discord の音声はグラス／シミュレータを通らない。Bot がサーバー側で受信→STT→字幕キューへ流し、アプリは文字を表示するだけ。このスパイクが Understand Me 本線の成否を決める。
 
+## 本日の検証結果（2026-11-23 追記）
+
+実環境でのスパイクを実施し、**ログイン／ボイス参加／DAVE ハンドシェイクは全て成功**。Bot はチャンネルに接続でき、受信パイプラインまで到達した。一方で依存関係に2件の破損を確認し、以下の通り対処した：
+
+- **davey 0.2.0 は壊れている。** transition/key まわりの API 変更で DAVE セッションが成立しない。venv は `davey==0.1.6` で動作確認済み。`requirements.txt` は `davey>=0.1,<0.2` にピン留めした（0.2 系は API を再検証してから上げる）。
+- **PR #54 は復号バグあり。** imayhaveborkedit/discord-ext-voice-recv PR #54 には二重復号（double-decryption）バグがあり、デコード結果がノイズ化する。venv は修正済みの **rdphillips7 フォーク**（github.com/rdphillips7/discord-ext-voice-recv）に差し替え、`requirements.txt` も同フォークを参照するよう更新した。
+- **デコード後音声の品質は最終再テスト待ち。** フォーク差し替え後の PCM で Whisper 書き起こし品質を確認するリテストが残っている。STT 本体は実装済み：faster-whisper `large-v3-turbo`（ローカル、CPU int8）、`STT_PROVIDER=whisper` で有効化（discord_bot / telegram_bot 両方の stt_interface）。
+
 ## 確認済みの前提（2026-11-21 調査）
 - 2026-03-02 に DAVE が全ボイスチャンネルで必須化。旧来の受信方法は全滅し、DAVE ダウングレード申告（protocol version 0）は接続拒否（close 4017）で不成立。
 - ただし受信の動作実績は複数公開されている（xhepi.dev のフィールドレポート、vapi-discord-bridge の互換ノート、複数の個人実装）。「原理的に可能」で、残るのは自分たちの環境で安定するかの検証のみ。
@@ -10,12 +18,13 @@
 ## 依存関係（ピン留め必須）
 ```
 discord.py[voice] >= 2.7.1            # DAVE 対応はこの世代から
-discord-ext-voice-recv @ git+https://github.com/imayhaveborkedit/discord-ext-voice-recv.git@refs/pull/54/head
-                                       # DAVE 復号対応は未マージ PR #54 のみ
-davey >= 0.1.0                         # DAVE の暗号バインディング
+discord-ext-voice-recv @ git+https://github.com/rdphillips7/discord-ext-voice-recv.git
+                                       # PR #54 は二重復号バグ（2026-11-23 実測）→ rdphillips7 フォーク
+davey >= 0.1, < 0.2                    # 0.2.0 は handshake 破壊（同日実測）
 PyNaCl, opus ランタイム                # discord.py[voice] の前提
+faster-whisper, numpy                  # STT_PROVIDER=whisper（ローカル STT）
 ```
-- リリースではなく「現実」にピン留めする。PR #54 がマージされたら通常リリースへ戻す。
+- リリースではなく「現実」にピン留めする。上流が安定版を出したら戻す。
 - py-cord は DAVE 未対応（close 4017）なので使わない。
 
 ## ハマりどころ（先行事例から）

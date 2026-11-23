@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import threading
 import time
 from typing import Callable, Dict, Optional
 
@@ -95,32 +96,43 @@ class CaptionPoster:
 
 
 class SpeakerSegmenter:
-    """Accumulates PCM per speaker and flushes utterances on silence."""
+    """Accumulates PCM per speaker and flushes utterances on silence.
+
+    feed() runs on the voice_recv packet thread while flush_idle() runs on
+    the bot's event loop, so the shared buffers are guarded by a lock. The
+    (slow) utterance callback always runs outside the lock.
+    """
 
     def __init__(self, on_utterance: Callable[[str, bytes], None]) -> None:
         self._buffers: Dict[str, bytearray] = {}
         self._last_seen: Dict[str, float] = {}
+        self._lock = threading.Lock()
         self._on_utterance = on_utterance
 
     def feed(self, speaker: str, pcm: bytes) -> None:
-        buf = self._buffers.setdefault(speaker, bytearray())
-        buf.extend(pcm)
-        self._last_seen[speaker] = time.monotonic()
+        with self._lock:
+            buf = self._buffers.setdefault(speaker, bytearray())
+            buf.extend(pcm)
+            self._last_seen[speaker] = time.monotonic()
 
     def flush_idle(self, now: Optional[float] = None) -> None:
         """Flush every speaker who has been silent past the gap."""
         now = time.monotonic() if now is None else now
-        for speaker, last in list(self._last_seen.items()):
-            if now - last >= SILENCE_GAP_SECONDS:
-                self._flush(speaker)
+        with self._lock:
+            idle = [s for s, last in self._last_seen.items() if now - last >= SILENCE_GAP_SECONDS]
+        for speaker in idle:
+            self._flush(speaker)
 
     def flush_all(self) -> None:
-        for speaker in list(self._buffers):
+        with self._lock:
+            speakers = list(self._buffers)
+        for speaker in speakers:
             self._flush(speaker)
 
     def _flush(self, speaker: str) -> None:
-        pcm = bytes(self._buffers.pop(speaker, bytearray()))
-        self._last_seen.pop(speaker, None)
+        with self._lock:
+            pcm = bytes(self._buffers.pop(speaker, bytearray()))
+            self._last_seen.pop(speaker, None)
         if len(pcm) < BYTES_PER_SECOND * MIN_UTTERANCE_SECONDS:
             return  # too short to be speech; drop quietly
         try:
@@ -204,6 +216,7 @@ class ReceiverBot(discord.Client):
         self._stt = stt
         self._segmenter = SpeakerSegmenter(self._handle_utterance)
         self._flusher: Optional[asyncio.Task] = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     def _handle_utterance(self, speaker: str, pcm: bytes) -> None:
         """Segmenter callback (sync): transcribe, then post asynchronously."""
@@ -238,14 +251,28 @@ class ReceiverBot(discord.Client):
                 log.info("Dumped utterance WAV: %s", path)
             except Exception:
                 log.exception("WAV dump failed")
+        # This callback may run on the event loop (silence flush) or on the
+        # library's packet thread (sink cleanup). run_coroutine_threadsafe
+        # is correct from both; get_running_loop() would raise off-loop and
+        # drop the caption.
+        loop = self._loop
+        if loop is None:
+            log.error("Event loop not ready; utterance from %s dropped", speaker)
+            return
+        asyncio.run_coroutine_threadsafe(self._process_utterance(speaker, pcm), loop)
+
+    async def _process_utterance(self, speaker: str, pcm: bytes) -> None:
+        """Transcribe off the event loop (Whisper blocks for seconds), then post."""
         try:
-            text = self._stt.transcribe(pcm, SAMPLE_RATE, CHANNELS, speaker)
+            text = await asyncio.to_thread(
+                self._stt.transcribe, pcm, SAMPLE_RATE, CHANNELS, speaker
+            )
         except Exception:
             log.exception("STT failed for speaker %s; utterance dropped", speaker)
             return
         if not text:
             return
-        asyncio.get_running_loop().create_task(self._poster.post(speaker, text))
+        await self._poster.post(speaker, text)
 
     async def _flush_loop(self) -> None:
         while True:
@@ -257,6 +284,7 @@ class ReceiverBot(discord.Client):
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s", self.user)
+        self._loop = asyncio.get_running_loop()
         channel = self.get_channel(self._channel_id)
         if channel is None:
             log.error("Channel %s not found (wrong ID, or bot not in that guild)", self._channel_id)
