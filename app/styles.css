@@ -34,10 +34,17 @@ html, body {
   border-top: 1px solid #0a3d27; padding-top: 5px;
 }
 
-/* --- captions --- */
-#caption-list { display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+/* --- captions ---
+   Mirrors the lens layout: history rows sit above the latest utterance,
+   and the block is vertically centered so the latest lands at the visual
+   center of the frame. */
+#caption-list {
+  flex: 1; display: flex; flex-direction: column; justify-content: center;
+  gap: 8px; overflow: hidden; transition: opacity .25s;
+}
+#caption-list.dimmed { opacity: .55; }
 .caption { font-size: 24px; line-height: 1.35; }
-.caption .speaker { color: #7dffc9; font-weight: bold; margin-right: 8px; }
+.caption .spk { font-size: 15px; color: #00b36b; }
 .caption.old { color: #009e63; font-size: 20px; }
 .caption.latest { color: #00ff9d; }
 

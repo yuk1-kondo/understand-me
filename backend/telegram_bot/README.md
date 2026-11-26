@@ -13,8 +13,8 @@ of the demo (an instruction from family / a colleague outside Discord).
 |---|---|
 | Instruction arrives by voice | User sends a Telegram **voice message** (or plain text, treated the same way) |
 | Read: captions on the lens | Audio is transcribed via `stt_interface`, then posted to the core backend caption queue: `POST {BACKEND_URL}/captions {"speaker", "text"}` — the same queue the G2 app renders |
-| Check: checksum points | `POST {BACKEND_URL}/checksum/extract` extracts the slots (deadline / quantity / task / destination); the bot replies with the confirmation points and inline buttons **[正しい] [直したい]** |
-| Write: confirmed understanding goes back | **正しい** → the bot replies with the confirmed text. **直したい** → the bot asks for a corrected instruction and runs the checksum on it again |
+| Check: checksum points | `POST {BACKEND_URL}/checksum/extract` extracts the slots (deadline / quantity / task / destination); the bot replies with the confirmation points and inline buttons **[この内容で確定] [訂正文を入力]** |
+| Write: confirmed understanding goes back | **この内容で確定** → the bot replies with the confirmed text. **訂正文を入力** → the bot asks for the full corrected instruction and runs the checksum on it again |
 
 The pending checksum is kept per chat (one active instruction per
 chat), which matches how the glasses flow works: one instruction is
@@ -56,7 +56,7 @@ Then in Telegram: `/start`, and send a voice note or a text such as
 With the fake STT provider, any voice note transcribes to the canonical
 test instruction 「木曜日までに資料を3部、教務部へ提出してください」 —
 useful for rehearsing the Thursday/Friday misunderstanding scene:
-confirm it, or tap 直したい and send the Friday version to watch the
+confirm it, or tap 訂正文を入力 and send the Friday version to watch the
 checksum re-run.
 
 ## Files

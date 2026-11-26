@@ -9,9 +9,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+from collections import deque
 from datetime import datetime, timezone
 
 from fastapi import WebSocket
+
+DEFAULT_CAPTION_MAX = 200
 
 
 def now_iso() -> str:
@@ -19,11 +23,26 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class CaptionStore:
-    """In-memory, append-only list of captions."""
+def _env_int(name: str, default: int) -> int:
+    """Positive int from the environment, falling back to `default`."""
+    try:
+        value = int(os.environ.get(name, ""))
+    except ValueError:
+        return default
+    return value if value > 0 else default
 
-    def __init__(self) -> None:
-        self._captions: list[dict] = []
+
+class CaptionStore:
+    """In-memory caption list bounded to the newest entries.
+
+    The bound keeps a long-running process from accumulating stale
+    captions: once `max_items` is exceeded, the oldest are dropped.
+    """
+
+    def __init__(self, max_items: int | None = None) -> None:
+        if max_items is None:
+            max_items = _env_int("UM_CAPTION_MAX", DEFAULT_CAPTION_MAX)
+        self._captions: deque[dict] = deque(maxlen=max_items)
 
     def add(self, speaker: str, text: str) -> dict:
         caption = {"speaker": speaker, "text": text, "ts": now_iso()}

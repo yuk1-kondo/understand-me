@@ -9,9 +9,14 @@ no Discord/Telegram tokens.
 |---|---|---|
 | `01-caption-view.png` | 576×288 glasses framebuffer: speaker-labelled live captions （佐藤/田中）, `LIVE` badge, `▲ 確認カードがあります` alert | `GET /api/screenshot/glasses` |
 | `02-checksum-card.png` | 576×288 glasses framebuffer: 理解チェック card — 確認ポイント: 期限 / 指示: 木曜日 / 復唱: 金曜日, focus box on 確認する | `POST /api/input {"action":"click"}` then `GET /api/screenshot/glasses` |
+| `ux-after-caption.png` | Post-UX-review caption view (see `docs/UX_REVIEW_2026-11-23.md`): clipped footer fixed, dedicated bright alert line, `…` truncation, no edge nubs | `scripts/display_check.py` screenshot #1 |
+| `ux-after-card.png` | Post-UX-review checksum card: dim label / bright value split, unmoved list focus, full footer | `scripts/display_check.py` screenshot #2 |
+| `ux-after-*-onblack.png` | The same two framebuffers composited on black (RGB) for easy viewing | PIL `alpha_composite` |
+| `display-check-{captions,latest}.png` | Raw framebuffers re-written by every `scripts/display_check.py` run | the check script |
 
-Both are RGBA PNGs straight from the simulator's LVGL framebuffer — keep them
-RGBA; converting to RGB fuses background and text (both pure green).
+The `01/02/ux-*` PNGs are straight from the simulator's LVGL framebuffer —
+keep them RGBA; converting to RGB fuses background and text (both pure
+green). Use the `-onblack` files for embedding anywhere.
 
 ## Exactly what was run
 
@@ -104,8 +109,8 @@ To record:
 4. **Beat 3 — the card (~40 s).** Tap the simulator's touchpad area (or
    `POST /api/input {"action":"click"}`). The 理解チェック card shows
    指示: 木曜日 vs 復唱: 金曜日.
-5. **Beat 4 — resolve (~30 s).** `down` to move focus to 正しい内容を送る,
-   `click` to send — glasses show 送信しました and auto-return to captions;
+5. **Beat 4 — resolve (~30 s).** `down` to move focus to 訂正を記録する,
+   `click` to send — glasses show 訂正を記録しました and auto-return to captions;
    the backend logs the `send_corrected` response. (Or `click` on 確認する
    for the confirm path.)
 6. **Beat 5 — exit (~10 s).** `double_click` on the root page raises the

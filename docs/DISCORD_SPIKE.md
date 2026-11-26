@@ -57,3 +57,19 @@ faster-whisper, numpy                  # STT_PROVIDER=whisper（ローカル STT
 - Receiving Voice in Discord After DAVE: A Field Report — https://www.xhepi.dev/logs/discord-dave-voice-receive/
 - discord-ext-voice-recv PR #54（DAVE decryption）— https://github.com/imayhaveborkedit/discord-ext-voice-recv/pull/54
 - vapi-discord-bridge: DAVE incompatibility note / voice bridge protocols（GitHub）
+
+## RESOLVED — 2026-11-25 19:56 JST 実音声テストで確認
+
+文字化けは解消。動作確認済みの組み合わせ:
+- discord.py 2.7.1
+- discord-ext-voice_recv 0.5.4a187（フォーク版）
+- davey 0.1.6（>=0.2 は不可）
+- faster-whisper 1.2.1 / large-v3-turbo（CPU int8）
+
+テスト文「テストです。木曜日までに資料を3部、教務部へ提出してください。」→
+字幕「テストです。木曜日までに資料を3部、4部へ提出してください。」
+（教務部→4部 は Whisper の聞き取り違いで、文字化けではない）
+
+残課題（軽微）: ほぼ無音の短い区間（0.5秒程度・低音量）で Whisper が
+「ご視聴ありがとうございました」等の定型幻覚を出すことがある。
+対策候補: 最小発話長の延長、無音ゲート、no_speech_prob フィルタ。

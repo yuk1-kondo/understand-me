@@ -144,15 +144,159 @@ class RuleBasedExtractor:
         return rest or None
 
 
+# --------------------------------------------------------------------------
+# Rule-based extractor (English)
+# --------------------------------------------------------------------------
+
+_WEEKDAY_EN_RE = re.compile(
+    r"\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b",
+    re.IGNORECASE,
+)
+_MONTH_EN = (
+    "January|February|March|April|May|June|July|August|September|October|"
+    "November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec"
+)
+_DATE_EN_RE = re.compile(
+    rf"\b(?:{_MONTH_EN})\.?\s+\d{{1,2}}(?:st|nd|rd|th)?\b", re.IGNORECASE
+)
+_TIME_EN_RE = re.compile(
+    r"\b\d{1,2}(?::\d{2})?\s*(?:a\.m\.|p\.m\.|am|pm)\b", re.IGNORECASE
+)
+_RELATIVE_EN_RE = re.compile(
+    r"\b(tomorrow|today|tonight|next week|this week|"
+    r"end of (?:the )?(?:week|month))\b",
+    re.IGNORECASE,
+)
+
+_NUMBER_WORDS_EN = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+    "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+    "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+    "twenty": 20,
+}
+_QUANTITY_EN_RE = re.compile(
+    r"\b(\d+|" + "|".join(_NUMBER_WORDS_EN) + r")\s+"
+    r"(copies|pages|items|sets|boxes|files|sheets|units|pcs)\b",
+    re.IGNORECASE,
+)
+
+_DESTINATION_EN_RE = re.compile(
+    r"\bto the ([\w' -]+? (?:office|department|room|team|desk|school|"
+    r"library|reception)|front desk)\b",
+    re.IGNORECASE,
+)
+
+# Leading politeness / pronoun filler stripped when isolating the task.
+_TASK_FILLER_EN_RE = re.compile(
+    r"^(please|okay|ok|so|well|i'll|i will|i|we|you|let's)\b[\s,]*",
+    re.IGNORECASE,
+)
+
+
+class EnglishExtractor:
+    """Regex-based slot extraction for English instruction sentences."""
+
+    def extract(self, text: str) -> Slots:
+        return Slots(
+            deadline=self._deadline(text),
+            quantity=self._quantity(text),
+            task=self._task(text),
+            destination=self._destination(text),
+        )
+
+    # -- individual slots -------------------------------------------------
+
+    def _deadline(self, text: str) -> Optional[str]:
+        parts = []
+        m = _DATE_EN_RE.search(text)
+        if m:
+            parts.append(" ".join(m.group(0).split()).title())
+        else:
+            m = _WEEKDAY_EN_RE.search(text)
+            if m:
+                parts.append(m.group(1).capitalize())
+            else:
+                m = _RELATIVE_EN_RE.search(text)
+                if m:
+                    parts.append(" ".join(m.group(1).lower().split()))
+        t = _TIME_EN_RE.search(text)
+        if t:
+            parts.append(re.sub(r"\.", "", t.group(0)).upper().replace(" ", ""))
+        return " ".join(parts) or None
+
+    def _quantity(self, text: str) -> Optional[str]:
+        m = _QUANTITY_EN_RE.search(text)
+        if not m:
+            return None
+        raw = m.group(1).lower()
+        number = int(raw) if raw.isdigit() else _NUMBER_WORDS_EN[raw]
+        return f"{number} {m.group(2).lower()}"
+
+    def _destination(self, text: str) -> Optional[str]:
+        m = _DESTINATION_EN_RE.search(text)
+        if not m:
+            return None
+        return "the " + " ".join(m.group(1).lower().split())
+
+    def _task(self, text: str) -> Optional[str]:
+        """Whatever remains after removing the other slots is the task core.
+
+        Both sides of a comparison go through the exact same stripping, so
+        leftover words affect original and paraphrase identically.
+        """
+        rest = text
+        for pattern in (
+            _DATE_EN_RE,
+            _WEEKDAY_EN_RE,
+            _RELATIVE_EN_RE,
+            _TIME_EN_RE,
+            _QUANTITY_EN_RE,
+            _DESTINATION_EN_RE,
+        ):
+            rest = pattern.sub("", rest, count=1)
+        rest = re.sub(r"\b(by|on|at|before)\b", "", rest, flags=re.IGNORECASE)
+        rest = rest.strip(" .,")
+        for _ in range(2):  # e.g. "Okay, please ..." / "I'll ..."
+            rest = _TASK_FILLER_EN_RE.sub("", rest)
+        rest = re.sub(r"\s+", " ", rest).strip(" .,")
+        return rest or None
+
+
+# --------------------------------------------------------------------------
+# Bilingual routing
+# --------------------------------------------------------------------------
+
+_JAPANESE_RE = re.compile(r"[぀-ヿ一-鿿]")
+
+
+def looks_japanese(text: str) -> bool:
+    """True when the text contains any kana or kanji."""
+    return bool(_JAPANESE_RE.search(text))
+
+
+class BilingualExtractor:
+    """Routes each text to the Japanese or English rule-based extractor."""
+
+    def __init__(self) -> None:
+        self._ja = RuleBasedExtractor()
+        self._en = EnglishExtractor()
+
+    def extract(self, text: str) -> Slots:
+        if looks_japanese(text):
+            return self._ja.extract(text)
+        return self._en.extract(text)
+
+
 def get_extractor() -> SlotExtractor:
     """Return the configured slot extractor.
 
-    Today this is always the rule-based extractor, which needs no API key.
-    A Claude-based extractor can be dropped in here later (selected when
-    ANTHROPIC_API_KEY is set) without changing callers.
+    Today this is the bilingual rule-based extractor, which needs no API
+    key. A Claude-based extractor can be dropped in here later (selected
+    when ANTHROPIC_API_KEY is set) without changing callers.
     """
     _ = os.environ.get("ANTHROPIC_API_KEY")  # reserved for the Claude extractor
-    return RuleBasedExtractor()
+    return BilingualExtractor()
 
 
 # --------------------------------------------------------------------------

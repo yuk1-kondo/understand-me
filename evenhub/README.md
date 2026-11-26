@@ -116,7 +116,9 @@ and `/api/input`:
 - `down` moves list focus silently in firmware; `click` emits `listEvent` with
   `currentSelectItemIndex: 1` → `POST /checksum/respond` fired with
   `send_corrected` (fetch fails only because no backend is running).
-- `送信しました` shows, then auto-returns to captions after 1.8 s.
+- `記録しました` shows once the POST returns `status: "ok"`, then
+  auto-returns to captions after 1.8 s; a failed or `ignored` POST keeps
+  the card up for retry instead.
 - `double_click` → `sysEvent eventType 3` → `shutDownPageContainer(1)` invoked.
 - Zero glyph warnings and zero failed container calls in the simulator log.
 

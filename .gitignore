@@ -1,7 +1,17 @@
+# secrets — never commit
 .env
+.env.local
+
+# python
 .venv/
+venv/
 __pycache__/
 *.pyc
-node_modules/
 .pytest_cache/
-*.ehpk
+
+# node / build output
+node_modules/
+evenhub/dist/
+
+# os
+.DS_Store

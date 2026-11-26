@@ -26,27 +26,154 @@ import {
 const BACKEND = (import.meta.env.VITE_BACKEND_URL as string | undefined) || 'http://localhost:8000'
 const POLL_MS = 2000
 
+/* ---------------- i18n ----------------
+   ?lang=ja keeps the original Japanese UI; anything else — including no
+   query at all — falls back to English (submission build default). */
+type Lang = 'ja' | 'en'
+const LANG: Lang = new URLSearchParams(location.search).get('lang') === 'ja' ? 'ja' : 'en'
+document.documentElement.lang = LANG
+
+const STRINGS = {
+  ja: {
+    notDetected: '検出できず',
+    connCaptionsOnly: '字幕のみ',
+    connCardsOnly: 'カードのみ',
+    connOffline: '切断',
+    footerToCard: 'タップ：確認カードへ',
+    backendDown: 'バックエンド切断',
+    captionsStopped: '字幕更新停止',
+    cardsUnavailable: '確認カード取得不可',
+    waiting: '会話を待っています',
+    alertPending: '▲ 確認カードがあります',
+    checksumTitle: '理解チェック',
+    fieldLabels: '指示\n復唱',
+    emptyCard: '確認が必要な項目はありません',
+    stateOk: 'OK',
+    stateUpdated: '更新あり',
+    stateCheck: '要確認',
+    stateSending: '処理中',
+    stateRecorded: '記録済',
+    stateRetry: '未記録',
+    slotNewer: '新しい確認があります',
+    slotUpdated: 'この確認は更新されました',
+    slotSending: '記録しています…',
+    slotRecordedCorrected: '訂正を記録しました',
+    slotRecordedConfirmed: '確認を記録しました',
+    slotRetry: '記録できませんでした',
+    slotCheck: (slot: string, extra: number) =>
+      `確認ポイント：${slot}${extra > 0 ? `　他${extra}件` : ''}`,
+    footerSelect: '↑↓：選択　タップ：決定',
+    footerBack: 'タップ：字幕へ戻る',
+    choices: {
+      pending: ['確認する', '訂正を記録する'],
+      pendingNoOriginal: ['確認する', '字幕へ戻る'],
+      retry: ['再試行する', '字幕へ戻る'],
+      back: ['字幕へ戻る'],
+    },
+  },
+  en: {
+    notDetected: 'not detected',
+    connCaptionsOnly: 'captions only',
+    connCardsOnly: 'cards only',
+    connOffline: 'OFFLINE',
+    footerToCard: 'Tap: view card',
+    backendDown: 'backend offline',
+    captionsStopped: 'captions stopped',
+    cardsUnavailable: 'cards unavailable',
+    waiting: 'Waiting for speech',
+    alertPending: '▲ Confirmation card',
+    checksumTitle: 'Double-check',
+    fieldLabels: 'Said\nHeard',
+    emptyCard: 'Nothing to confirm',
+    stateOk: 'OK',
+    stateUpdated: 'Updated',
+    stateCheck: 'Check',
+    stateSending: 'Saving',
+    stateRecorded: 'Saved',
+    stateRetry: 'Failed',
+    slotNewer: 'Newer card pending',
+    slotUpdated: 'This card was updated',
+    slotSending: 'Recording…',
+    slotRecordedCorrected: 'Correction recorded',
+    slotRecordedConfirmed: 'Confirmed',
+    slotRetry: 'Recording failed',
+    slotCheck: (slot: string, extra: number) =>
+      `Check: ${slot}${extra > 0 ? ` +${extra} more` : ''}`,
+    footerSelect: 'Scroll: select  Tap: OK',
+    footerBack: 'Tap: back',
+    choices: {
+      pending: ['Confirm', 'Record correction'],
+      pendingNoOriginal: ['Confirm', 'Back to captions'],
+      retry: ['Retry', 'Back to captions'],
+      back: ['Back to captions'],
+    },
+  },
+}
+const S = STRINGS[LANG]
+
 /* ---------------- dummy data (standalone demo) ---------------- */
-const DUMMY_CAPTIONS = [
-  { speaker: '田中さん', text: 'じゃあ来週の資料の件だけど' },
-  { speaker: '田中さん', text: '木曜日までに、3部' },
-  { speaker: '田中さん', text: '教務部へ提出をお願いできる？' },
-  { speaker: '佐藤さん', text: '了解、木曜日ですね' },
-  { speaker: '田中さん', text: 'そう、木曜の午後3時まで' },
-]
-const DUMMY_CHECKSUM = { id: 'demo-1', slot: '期限', original: '木曜日', heard: '金曜日' }
+const DUMMY_CAPTIONS =
+  LANG === 'ja'
+    ? [
+        { speaker: '田中さん', text: 'じゃあ来週の資料の件だけど' },
+        { speaker: '田中さん', text: '木曜日までに、3部' },
+        { speaker: '田中さん', text: '教務部へ提出をお願いできる？' },
+        { speaker: '佐藤さん', text: '了解、木曜日ですね' },
+        { speaker: '田中さん', text: 'そう、木曜の午後3時まで' },
+      ]
+    : [
+        { speaker: 'Tanaka', text: "About next week's handout" },
+        { speaker: 'Tanaka', text: 'I need 3 copies by Thursday' },
+        { speaker: 'Tanaka', text: 'submitted to the office, OK?' },
+        { speaker: 'Sato', text: 'Got it, Thursday' },
+        { speaker: 'Tanaka', text: 'Right, Thursday by 3pm' },
+      ]
+const DUMMY_CHECKSUM =
+  LANG === 'ja'
+    ? { id: 'demo-1', slot: '期限', original: '木曜日', heard: '金曜日' }
+    : { id: 'demo-1', slot: 'deadline', original: 'Thursday', heard: 'Friday' }
+
+/* ---------------- display rules (docs/UX_REVIEW_2026-11-23.md) ---------
+   Firmware font: ~27px line pitch, ~24 full-width glyphs per 576px row.
+   A text container must be taller than its content or LVGL clips it and
+   draws a scroll nub — so every string gets clipped to its line budget. */
+const LINE = 24
+const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
+/* Caption layout (docs/UX_COMFORT_2026-11-25.md): the latest utterance is
+   pinned at the optical center of the 288px lens (y ~130-200); up to
+   HISTORY_MAX dimmed rows flow upward above it. Speaker names never eat
+   the body budget — history prefixes cap the name at SPEAKER_MAX glyphs
+   and the latest row gets its own dim name line (LATEST_NAME_MAX). */
+const HISTORY_MAX = 2
+const SPEAKER_MAX = 6
+const LATEST_NAME_MAX = 10
+// Slot values the backend could not extract arrive as null (H-04).
+const show = (s: string | null | undefined) => (s ? clip(s, LINE - 4) : S.notDetected)
 
 /* ---------------- state (mirrors app/app.js) ---------------- */
 type View = 'captions' | 'checksum'
-type Checksum = { id: string; slot: string; original: string; heard: string }
+type Checksum = { id: string; slot: string; original: string | null; heard: string | null; diffs?: unknown[] }
+type CsResult = 'pending' | 'sending' | 'recorded' | 'retry'
+type CsMode = 'empty' | 'pending' | 'pendingNoOriginal' | 'sending' | 'recorded' | 'retry' | 'stale'
 
 let view: View = 'captions'
-let backendLive = false
+// H-03: captions and checksum cards have separate liveness so one failing
+// endpoint cannot mask the other.
+let captionsOk = false
+let cardsOk = false
+let captionsEverOk = false // once real data arrived, never fall back to dummies
+let cardsEverOk = false
 let captions: { speaker: string; text: string }[] = []
 let dummyIdx = 0
-let checksum: Checksum | null = null
-let checksumHandled = false
-let csMode: 'pending' | 'empty' | 'done' = 'empty' // last-rendered checksum layout
+let checksum: Checksum | null = null // latest card from the backend
+let checksumHandled = false // latest card already recorded by this app
+// H-01: the card under review is frozen on view entry so a newer card
+// arriving mid-review can never be acted on by stale input.
+let viewed: Checksum | null = null
+let viewedStale = false
+let viewedResult: CsResult = 'pending'
+let lastAction: 'confirm' | 'send_corrected' = 'confirm'
+let csMode: CsMode = 'empty' // last-rendered checksum layout
 let exited = false // true once the system exit dialog is up; stop updating dead containers
 
 let bridge: EvenAppBridge
@@ -59,56 +186,124 @@ const setStatus = (s: string) => {
 /* ---------------- container helpers ---------------- */
 const text = (p: Partial<TextContainerProperty>) => new TextContainerProperty(p)
 
+/* ---------------- connection status (H-03) ---------------- */
+const connLabel = () => {
+  if (captionsOk && cardsOk) return 'LIVE'
+  if (captionsOk) return S.connCaptionsOnly
+  if (cardsOk) return S.connCardsOnly
+  return captionsEverOk || cardsEverOk ? S.connOffline : 'DEMO'
+}
+
+const captionFooter = (pending: boolean) => {
+  if (pending) return S.footerToCard
+  const capDown = captionsEverOk && !captionsOk
+  const cardDown = cardsEverOk && !cardsOk
+  if (capDown && cardDown) return S.backendDown
+  if (capDown) return S.captionsStopped
+  if (cardDown) return S.cardsUnavailable
+  return ' '
+}
+
 function captionPage(): { textObject: TextContainerProperty[] } {
-  const shown = captions.slice(-4)
-  const older = shown
+  const pending = !!(checksum && !checksumHandled)
+  // Gaze guidance: while a card waits, the caption side drops one
+  // brightness step so the alert (and the card behind it) stays the
+  // brightest thing on the lens. Steady level — never blinking.
+  const dim = (base: number) => Math.max(1, base - (pending ? 1 : 0))
+  const shown = captions.slice(-(HISTORY_MAX + 1))
+  const history = shown
     .slice(0, -1)
-    .map((c) => `${c.speaker}: ${c.text}`)
+    .map((c) => clip(`${clip(c.speaker, SPEAKER_MAX)}: ${c.text}`, LINE))
     .join('\n')
-  const latest = shown.length ? `${shown.at(-1)!.speaker}: ${shown.at(-1)!.text}` : ' '
-  const footer =
-    (checksum && !checksumHandled ? '▲ 確認カードがあります\n' : '') + 'タップ：確認カードへ'
+  const latest = shown.at(-1)
   return {
     textObject: [
-      text({ xPosition: 0, yPosition: 0, width: 400, height: 30, paddingLength: 4, containerID: 1, containerName: 'header', content: 'Understand Me' }),
-      text({ xPosition: 400, yPosition: 0, width: 172, height: 30, paddingLength: 4, containerID: 2, containerName: 'conn', content: backendLive ? 'LIVE' : 'DEMO', textColor: 2 }),
-      text({ xPosition: 0, yPosition: 34, width: 576, height: 150, paddingLength: 4, containerID: 3, containerName: 'capold', content: older || ' ', textColor: 2, isEventCapture: 1 }),
-      text({ xPosition: 0, yPosition: 186, width: 576, height: 60, paddingLength: 4, containerID: 4, containerName: 'capnew', content: latest }),
-      text({ xPosition: 0, yPosition: 250, width: 576, height: 38, paddingLength: 4, containerID: 5, containerName: 'footer', content: footer, textColor: 3 }),
+      text({ xPosition: 0, yPosition: 0, width: 400, height: 36, paddingLength: 4, containerID: 1, containerName: 'header', content: 'Understand Me' }),
+      text({ xPosition: 400, yPosition: 0, width: 172, height: 36, paddingLength: 4, containerID: 2, containerName: 'conn', content: connLabel(), textColor: 2 }),
+      text({ xPosition: 0, yPosition: 40, width: 576, height: 64, paddingLength: 4, containerID: 3, containerName: 'hist', content: history || ' ', textColor: dim(2) }),
+      text({ xPosition: 0, yPosition: 104, width: 576, height: 36, paddingLength: 4, containerID: 4, containerName: 'spk', content: latest ? clip(latest.speaker, LATEST_NAME_MAX) : ' ', textColor: dim(2) }),
+      text({ xPosition: 0, yPosition: 140, width: 576, height: 66, paddingLength: 4, containerID: 5, containerName: 'capnew', content: latest ? clip(latest.text, LINE * 2 - 4) : S.waiting, textColor: dim(4), isEventCapture: 1 }),
+      text({ xPosition: 0, yPosition: 210, width: 576, height: 38, paddingLength: 4, containerID: 6, containerName: 'alert', content: pending ? S.alertPending : ' ' }),
+      text({ xPosition: 0, yPosition: 250, width: 576, height: 38, paddingLength: 4, containerID: 7, containerName: 'footer', content: captionFooter(pending), textColor: 2 }),
     ],
   }
 }
 
-function checksumMode(): 'pending' | 'empty' | 'done' {
-  if (checksumHandled) return 'done'
-  return checksum ? 'pending' : 'empty'
+function checksumMode(): CsMode {
+  if (!viewed) return 'empty'
+  if (viewedStale) return 'stale'
+  if (viewedResult !== 'pending') return viewedResult
+  // H-04: with no instruction-side value there is nothing to correct
+  // against, so the correction action must not be offered.
+  return viewed.original ? 'pending' : 'pendingNoOriginal'
 }
 
-function checksumCardText(): string {
-  if (checksumHandled) return '送信しました'
-  if (!checksum) return '確認が必要な項目はありません'
-  return `確認ポイント：${checksum.slot}\n指示：${checksum.original}\n復唱：${checksum.heard}`
+const CHOICE_ITEMS: Record<CsMode, string[]> = {
+  pending: [...S.choices.pending],
+  pendingNoOriginal: [...S.choices.pendingNoOriginal],
+  retry: [...S.choices.retry],
+  empty: [...S.choices.back],
+  stale: [...S.choices.back],
+  sending: [...S.choices.back],
+  recorded: [...S.choices.back],
+}
+
+function checksumFields(): { slot: string; labels: string; values: string; state: string; slotColor: number } {
+  const mode = checksumMode()
+  if (mode === 'empty') {
+    return { slot: S.emptyCard, labels: ' ', values: ' ', state: S.stateOk, slotColor: 3 }
+  }
+  const c = viewed!
+  const labels = S.fieldLabels
+  const values = `${show(c.original)}\n${show(c.heard)}`
+  switch (mode) {
+    case 'stale':
+      return {
+        slot: checksum && checksum.id !== c.id ? S.slotNewer : S.slotUpdated,
+        labels, values, state: S.stateUpdated, slotColor: 3,
+      }
+    case 'sending':
+      return { slot: S.slotSending, labels, values, state: S.stateSending, slotColor: 3 }
+    case 'recorded':
+      return {
+        slot: lastAction === 'send_corrected' ? S.slotRecordedCorrected : S.slotRecordedConfirmed,
+        labels, values, state: S.stateRecorded, slotColor: 4,
+      }
+    case 'retry':
+      return { slot: S.slotRetry, labels, values, state: S.stateRetry, slotColor: 3 }
+    default: {
+      const extra = (c.diffs?.length ?? 1) - 1
+      return {
+        slot: S.slotCheck(c.slot, extra),
+        labels, values, state: S.stateCheck, slotColor: 3,
+      }
+    }
+  }
 }
 
 function checksumPage(): RebuildPageContainer {
-  const pending = checksum && !checksumHandled
-  const items = pending ? ['確認する', '正しい内容を送る'] : ['字幕へ戻る']
+  const mode = checksumMode()
+  const items = CHOICE_ITEMS[mode]
+  const f = checksumFields()
+  const selectable = mode === 'pending' || mode === 'pendingNoOriginal' || mode === 'retry'
   return new RebuildPageContainer({
-    containerTotalNum: 5,
+    containerTotalNum: 7,
     textObject: [
-      text({ xPosition: 0, yPosition: 0, width: 400, height: 30, paddingLength: 4, containerID: 1, containerName: 'header', content: '理解チェック' }),
-      text({ xPosition: 400, yPosition: 0, width: 172, height: 30, paddingLength: 4, containerID: 2, containerName: 'csstate', content: pending ? '要確認' : 'OK', textColor: 2 }),
-      text({ xPosition: 0, yPosition: 34, width: 576, height: 140, paddingLength: 4, containerID: 3, containerName: 'card', content: checksumCardText() }),
-      text({ xPosition: 0, yPosition: 264, width: 576, height: 24, paddingLength: 4, containerID: 5, containerName: 'footer', content: '↑↓：選択　タップ：決定', textColor: 2 }),
+      text({ xPosition: 0, yPosition: 0, width: 400, height: 36, paddingLength: 4, containerID: 1, containerName: 'header', content: S.checksumTitle }),
+      text({ xPosition: 400, yPosition: 0, width: 172, height: 36, paddingLength: 4, containerID: 2, containerName: 'csstate', content: f.state, textColor: 3 }),
+      text({ xPosition: 0, yPosition: 40, width: 576, height: 38, paddingLength: 4, containerID: 3, containerName: 'slot', content: f.slot, textColor: f.slotColor }),
+      text({ xPosition: 0, yPosition: 82, width: 96, height: 64, paddingLength: 4, containerID: 4, containerName: 'labels', content: f.labels, textColor: 2 }),
+      text({ xPosition: 100, yPosition: 82, width: 476, height: 64, paddingLength: 4, containerID: 5, containerName: 'values', content: f.values }),
+      text({ xPosition: 0, yPosition: 244, width: 576, height: 38, paddingLength: 4, containerID: 6, containerName: 'footer', content: selectable ? S.footerSelect : S.footerBack, textColor: 2 }),
     ],
     listObject: [
       new ListContainerProperty({
         xPosition: 0,
-        yPosition: 178,
+        yPosition: 150,
         width: 576,
-        height: 82,
+        height: 90,
         paddingLength: 4,
-        containerID: 4,
+        containerID: 7,
         containerName: 'choices',
         isEventCapture: 1,
         itemContainer: new ListItemContainerProperty({
@@ -123,44 +318,80 @@ function checksumPage(): RebuildPageContainer {
 }
 
 /* ---------------- rendering ---------------- */
-const upgrade = (containerID: number, containerName: string, content: string) =>
-  bridge.textContainerUpgrade(new TextContainerUpgrade({ containerID, containerName, content }))
+// Updates go through TextContainerUpgrade only, and a container is sent
+// again only when its content or brightness actually changed — settled
+// lines are never re-rendered, so a poll cycle causes no flicker.
+const BRIGHTNESS_DEFAULT = 4 // device default when textColor is omitted
+const sentContent = new Map<number, { content: string; color: number }>()
+
+function upgrade(containerID: number, containerName: string, content: string, color?: number) {
+  const c = color ?? BRIGHTNESS_DEFAULT
+  const prev = sentContent.get(containerID)
+  if (prev && prev.content === content && prev.color === c) return
+  sentContent.set(containerID, { content, color: c })
+  bridge.textContainerUpgrade(new TextContainerUpgrade({ containerID, containerName, content, textColor: c }))
+}
+
+// A page create/rebuild rewrites every container, so the cache must be
+// reseeded with exactly what was sent or the diffing goes stale.
+function rememberPage(texts: TextContainerProperty[] | undefined) {
+  sentContent.clear()
+  for (const t of texts ?? []) {
+    if (t.containerID !== undefined) {
+      sentContent.set(t.containerID, { content: t.content ?? '', color: t.textColor ?? BRIGHTNESS_DEFAULT })
+    }
+  }
+}
 
 function render() {
   if (exited) return
   if (view === 'captions') {
-    const page = captionPage().textObject
     // flicker-free in-place updates; layout never changes on this view
-    upgrade(2, 'conn', page[1].content!)
-    upgrade(3, 'capold', page[2].content!)
-    upgrade(4, 'capnew', page[3].content!)
-    upgrade(5, 'footer', page[4].content!)
+    for (const t of captionPage().textObject) {
+      upgrade(t.containerID!, t.containerName!, t.content ?? '', t.textColor)
+    }
   } else {
     const mode = checksumMode()
     if (mode !== csMode) {
       // list items change per mode -> full rebuild required
       csMode = mode
-      bridge.rebuildPageContainer(checksumPage())
+      const page = checksumPage()
+      bridge.rebuildPageContainer(page)
+      rememberPage(page.textObject)
     } else {
-      upgrade(2, 'csstate', checksum && !checksumHandled ? '要確認' : 'OK')
-      upgrade(3, 'card', checksumCardText())
+      const f = checksumFields()
+      upgrade(2, 'csstate', f.state, 3)
+      upgrade(3, 'slot', f.slot, f.slotColor)
+      upgrade(4, 'labels', f.labels, 2)
+      upgrade(5, 'values', f.values)
     }
   }
-  setStatus(`${view} | ${backendLive ? 'LIVE' : 'DEMO'} | checksum:${checksumMode()}`)
+  setStatus(`${view} | ${connLabel()} | checksum:${checksumMode()}`)
 }
 
 async function setView(next: View) {
   view = next
   if (next === 'captions') {
+    viewed = null
+    viewedStale = false
+    viewedResult = 'pending'
     const page = captionPage()
     await bridge.rebuildPageContainer(
       new RebuildPageContainer({ containerTotalNum: page.textObject.length, textObject: page.textObject }),
     )
+    rememberPage(page.textObject)
   } else {
+    // Freeze the card under review (H-01): polls keep updating `checksum`,
+    // but this view and its actions only ever see the frozen snapshot.
+    viewed = checksum ? { ...checksum } : null
+    viewedStale = false
+    viewedResult = 'pending'
     csMode = checksumMode()
-    await bridge.rebuildPageContainer(checksumPage())
+    const page = checksumPage()
+    await bridge.rebuildPageContainer(page)
+    rememberPage(page.textObject)
   }
-  setStatus(`${view} | ${backendLive ? 'LIVE' : 'DEMO'}`)
+  setStatus(`${view} | ${connLabel()}`)
 }
 
 /* ---------------- backend polling (contract unchanged) ---------------- */
@@ -175,13 +406,14 @@ async function pollCaptions() {
     const data = await fetchJSON('/captions')
     // Contract: { captions: [...] }; the current backend also serves a bare array.
     const list = Array.isArray(data?.captions) ? data.captions : Array.isArray(data) ? data : null
-    if (list) {
-      captions = list
-      backendLive = true
-    }
+    if (list) captions = list
+    captionsOk = true
+    captionsEverOk = true
   } catch {
-    backendLive = false
-    if (dummyIdx < DUMMY_CAPTIONS.length) captions.push(DUMMY_CAPTIONS[dummyIdx++])
+    captionsOk = false
+    // H-03: dummy captions are a standalone-demo fallback only. Once real
+    // captions arrived, a failed poll must never append sample lines.
+    if (!captionsEverOk && dummyIdx < DUMMY_CAPTIONS.length) captions.push(DUMMY_CAPTIONS[dummyIdx++])
   }
   render()
 }
@@ -197,35 +429,79 @@ async function pollChecksum() {
       checksum = null
       checksumHandled = false
     }
-    backendLive = true
+    cardsOk = true
+    cardsEverOk = true
   } catch {
-    if (!checksum && dummyIdx >= 3) {
+    cardsOk = false
+    // H-03: same standalone-only rule for the demo checksum card.
+    if (!cardsEverOk && !checksum && dummyIdx >= 3) {
       checksum = DUMMY_CHECKSUM
       checksumHandled = false
     }
+  }
+  // H-01: while a frozen card is under review, a different card arriving
+  // (or this one disappearing) marks the view stale so old input cannot
+  // act on a card the wearer never saw.
+  if (viewed && (viewedResult === 'pending' || viewedResult === 'retry')) {
+    if (!checksum || checksum.id !== viewed.id) viewedStale = true
   }
   render()
 }
 
 /* ---------------- checksum response ---------------- */
+// H-02: report the POST result, not optimism. Only status:"ok" counts as
+// recorded; "ignored" means the backend moved on to a different card, and
+// any failure leaves the card up for retry.
 async function respondChecksum(action: 'confirm' | 'send_corrected') {
-  if (!checksum || checksumHandled) return
-  checksumHandled = true
+  if (!viewed || viewedStale) return
+  if (viewedResult !== 'pending' && viewedResult !== 'retry') return
+  if (action === 'send_corrected' && !viewed.original) return
+  const card = viewed
+  lastAction = action
+  viewedResult = 'sending'
   render()
+
+  let outcome: 'ok' | 'ignored' | 'failed'
   try {
-    await fetch(BACKEND + '/checksum/respond', {
+    const res = await fetch(BACKEND + '/checksum/respond', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: checksum.id, action }),
+      body: JSON.stringify({ id: card.id, action }),
     })
+    if (!res.ok) {
+      outcome = 'failed'
+    } else {
+      const data = await res.json().catch(() => null)
+      outcome = data?.status === 'ok' ? 'ok' : data?.status === 'ignored' ? 'ignored' : 'failed'
+    }
   } catch {
-    // standalone demo: nothing to send to
+    outcome = 'failed'
   }
-  setTimeout(() => {
-    checksum = null
-    checksumHandled = false
-    setView('captions')
-  }, 1800)
+
+  if (outcome === 'ok' && checksum?.id === card.id) checksumHandled = true
+  if (view !== 'checksum' || viewed?.id !== card.id) {
+    render() // wearer left mid-flight; just keep the captions alert honest
+    return
+  }
+  if (outcome === 'ok') {
+    viewedResult = 'recorded'
+    render()
+    const id = card.id
+    // H-02: the auto-return timer applies only to the card we processed —
+    // a newer card that arrived meanwhile is never cleared by this timer.
+    setTimeout(() => {
+      if (view === 'checksum' && viewed?.id === id && viewedResult === 'recorded') {
+        if (checksum?.id === id) checksum = null
+        setView('captions')
+      }
+    }, 1800)
+  } else if (outcome === 'ignored') {
+    viewedStale = true
+    render()
+  } else {
+    viewedResult = 'retry'
+    render()
+  }
 }
 
 /* ---------------- input: G2 touchpad / R1 ring ---------------- */
@@ -258,15 +534,40 @@ function onEvent(event: EvenHubEvent) {
       return
     }
     if (isClick) {
-      if (checksum && !checksumHandled) {
-        // Prefer the focused list item; sysEvent clicks carry no index -> confirm.
-        const idx = l?.currentSelectItemIndex ?? 0
-        respondChecksum(idx === 1 ? 'send_corrected' : 'confirm')
+      // H-01: a card action runs only when the tap carries a real selection
+      // index from the choices list. A sysEvent tap carries no index and
+      // must never fall through to "confirm".
+      if (l && typeof l.currentSelectItemIndex === 'number') {
+        onChecksumChoice(l.currentSelectItemIndex)
       } else {
-        setView('captions')
+        const mode = checksumMode()
+        if (mode !== 'pending' && mode !== 'pendingNoOriginal' && mode !== 'retry') {
+          setView('captions')
+        }
       }
     }
   }
+}
+
+// Dispatch a focused-list tap by the current mode's item list.
+function onChecksumChoice(idx: number) {
+  const mode = checksumMode()
+  if (mode === 'pending' || mode === 'pendingNoOriginal') {
+    if (idx === 0) {
+      respondChecksum('confirm')
+    } else if (idx === 1) {
+      if (mode === 'pending') respondChecksum('send_corrected')
+      else setView('captions')
+    }
+    return
+  }
+  if (mode === 'retry') {
+    if (idx === 0) respondChecksum(lastAction)
+    else setView('captions')
+    return
+  }
+  // empty / stale / sending / recorded: the single item goes back.
+  if (idx === 0) setView('captions')
 }
 
 /* ---------------- boot ---------------- */
@@ -281,6 +582,7 @@ const result = await bridge.createStartUpPageContainer(
   }),
 )
 if (result !== 0) console.error('createStartUpPageContainer failed:', result)
+else rememberPage(page.textObject)
 
 bridge.onEvenHubEvent(onEvent)
 console.log('[understand-me] ready')

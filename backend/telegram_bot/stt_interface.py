@@ -61,7 +61,12 @@ class WhisperFileSTTProvider:
         return self._model
 
     def _transcribe_sync(self, audio_path: str) -> str:
-        segments, _info = self._load().transcribe(audio_path, language="ja", beam_size=1)
+        # UM_STT_LANGUAGE: 'ja' (default), 'en', or 'auto' (Whisper detects).
+        lang = os.environ.get("UM_STT_LANGUAGE", "ja").strip().lower()
+        language = None if lang in ("auto", "") else lang
+        segments, _info = self._load().transcribe(
+            audio_path, language=language, beam_size=1
+        )
         return "".join(seg.text for seg in segments).strip()
 
     async def transcribe(self, audio_path: str) -> str:

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=576, height=288, initial-scale=1">
@@ -15,30 +15,30 @@
         <span id="conn" class="conn">DEMO</span>
       </header>
       <div id="caption-list"></div>
-      <div id="checksum-alert" class="alert hidden">▲ 確認カードがあります（Tab）</div>
-      <footer class="hint">Tab：確認カードへ</footer>
+      <div id="checksum-alert" class="alert hidden">▲ Confirmation card (Tab)</div>
+      <footer class="hint" id="cap-footer">Tab: view card</footer>
     </section>
 
     <!-- ===== Checksum card view ===== -->
     <section id="view-checksum" class="view">
       <header class="bar">
-        <span class="title">理解チェック</span>
+        <span class="title" id="cs-title">Double-check</span>
         <span id="checksum-state" class="conn">—</span>
       </header>
       <div id="checksum-body">
-        <div id="checksum-empty" class="empty">確認が必要な項目はありません</div>
+        <div id="checksum-empty" class="empty">Nothing to confirm</div>
         <div id="checksum-card" class="card hidden">
-          <div class="slot" id="cs-slot">期限</div>
-          <div class="row"><span class="label">指示</span><span class="val" id="cs-original">木曜日</span></div>
-          <div class="row heard"><span class="label">復唱</span><span class="val" id="cs-heard">金曜日</span></div>
+          <div class="slot" id="cs-slot">deadline</div>
+          <div class="row"><span class="label" id="cs-label-original">Said</span><span class="val" id="cs-original">Thursday</span></div>
+          <div class="row heard"><span class="label" id="cs-label-heard">Heard</span><span class="val" id="cs-heard">Friday</span></div>
           <div class="choices">
-            <div class="choice" id="choice-confirm">確認する</div>
-            <div class="choice" id="choice-send">正しい内容を送る</div>
+            <div class="choice" id="choice-confirm">Confirm</div>
+            <div class="choice" id="choice-send">Record correction</div>
           </div>
         </div>
-        <div id="checksum-done" class="empty hidden">送信しました ✓</div>
+        <div id="checksum-done" class="empty hidden">Recorded</div>
       </div>
-      <footer class="hint">←→：選択　Enter：決定　Tab：字幕へ</footer>
+      <footer class="hint" id="cs-footer">←→: select  Enter: OK  Tab: captions</footer>
     </section>
   </div>
   <script src="app.js"></script>

@@ -57,6 +57,38 @@ class FakeSpeechToText(SpeechToText):
         return text
 
 
+def _stt_language() -> str | None:
+    """Recognition language from UM_STT_LANGUAGE.
+
+    'ja' (default), 'en', or 'auto'/'' for Whisper auto-detection (None).
+    """
+    lang = os.environ.get("UM_STT_LANGUAGE", "ja").strip().lower()
+    return None if lang in ("auto", "") else lang
+
+
+def _stt_prompt() -> str | None:
+    """Domain-vocabulary prompt matching the recognition language.
+
+    UM_STT_PROMPT always wins when set. Auto-detection gets no prompt so
+    it cannot bias the language choice.
+    """
+    override = os.environ.get("UM_STT_PROMPT")
+    if override:
+        return override
+    lang = _stt_language()
+    if lang is None:
+        return None
+    if lang.startswith("en"):
+        return (
+            "A school staff meeting. Academic office, staff room, reports, "
+            "copies, submit, deadline, Thursday, students, classes, events."
+        )
+    return (
+        "学校の会議での会話です。教務部、職員室、資料、部数、提出、"
+        "期限、木曜日、生徒、授業、行事。"
+    )
+
+
 class WhisperLocalSpeechToText(SpeechToText):
     """Real STT: faster-whisper running locally (CPU, int8).
 
@@ -88,8 +120,20 @@ class WhisperLocalSpeechToText(SpeechToText):
             factor = sample_rate // 16000
             n = (len(audio) // factor) * factor
             audio = audio[:n].reshape(-1, factor).mean(axis=1)
-        segments, _info = self._load().transcribe(audio, language="ja", beam_size=1)
-        return "".join(seg.text for seg in segments).strip()
+        segments, _info = self._load().transcribe(
+            audio,
+            language=_stt_language(),
+            beam_size=1,
+            vad_filter=True,
+            no_speech_threshold=0.6,
+            condition_on_previous_text=False,
+            temperature=0.0,
+            initial_prompt=_stt_prompt(),
+            without_timestamps=True,
+        )
+        return "".join(
+            seg.text for seg in segments if seg.no_speech_prob < 0.6
+        ).strip()
 
 
 class StubSpeechToText(SpeechToText):
