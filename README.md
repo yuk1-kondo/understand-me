@@ -25,7 +25,7 @@ Live captions solved "can I read what was said?" They did not solve "did I under
 - `backend/telegram_bot/` — Telegram voice-message tier running the same checksum loop
 - `scripts/display_check.py` — local end-to-end display regression check (build → backend → simulator → framebuffer assertions; see `docs/DISPLAY_CHECK.md`)
 
-Claude is used only as an internal AI component (slot extraction / comparison). The only external services integrated are Discord and Telegram, per Track 01.
+Slot extraction and comparison are rule-based and run offline; an optional Jev (TypeSafe AI) layer adds instruction/agreement judgments when `TYPESAFE_API_KEY` is set. The only external services integrated are Discord and Telegram, per Track 01.
 
 ## Setup
 
@@ -35,7 +35,7 @@ Backend (no API keys needed — extraction is rule-based):
 cd backend/core && python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --port 8000
-pytest            # 15 tests
+pytest            # 43 tests
 ```
 
 Even Hub app + simulator (needs `evenhub-simulator` + `evenhub` CLI from
@@ -87,4 +87,4 @@ Everything not listed above was created during the build week (Nov 23–29, 2026
 
 ## License
 
-_TODO._
+MIT

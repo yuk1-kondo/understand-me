@@ -91,6 +91,13 @@ POST /writeback/ack {"ids":[...]}  → キューから削除
   `test_confirm_queues_writeback_event` / `test_ack_removes_events` で確認済み。
 - 実プロセスへの結合確認（Discord/Telegram への実投稿）は未実施。再起動後に実機確認要。
 
+## 追記（2026-11-27）: ライブ検証の実施記録
+
+上記の「未実施」は本レポート作成時点の状態。以下のライブ検証はその後に実施済み：
+
+- **Discord 書き戻し（実投稿）**: 2026-11-26 11:24 JST、MBP 上の実プロセス（backend + receiver）で検証。指示文（佐藤「木曜日までに3部、教務部へ提出をお願いできますか」, source=discord, origin=一般チャンネル）と復唱（田中「金曜日までに…」）を投入 → カード `f7780d477041`（期限 木曜日 vs 金曜日）→ confirm → 書き戻しイベントがキューされ、10秒以内に receiver が「Writeback posted to #一般」をログ出力し、確定文が Discord サーバーの #一般 チャットに実際に投稿されたことを目視確認。検証後に backend を再起動しストアは空に戻した。
+- **Telegram 実音声 E2E**: 2026-11-24 夕方、実ボット（understandme_yukilab_bot）＋実音声で検証。挨拶・早口言葉（「隣の客はよくかき食う客だ」）を正確に文字起こし、指示文から deadline=木曜日 / quantity=3部 / destination=教務部 を抽出、確認ボタンまで動作。
+
 ## 変更しなかった点・未解決事項
 
 - evenhub / app の UI・文言は未変更。`respond` は「記録」に加え書き戻しも行うが、
