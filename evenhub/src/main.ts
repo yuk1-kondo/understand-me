@@ -539,6 +539,14 @@ function onEvent(event: EvenHubEvent) {
       // must never fall through to "confirm".
       if (l && typeof l.currentSelectItemIndex === 'number') {
         onChecksumChoice(l.currentSelectItemIndex)
+      } else if (l) {
+        // Simulator compat: the Even Hub simulator (0.9.x) strips eventType
+        // and currentSelectItemIndex from list events — real G2 firmware
+        // always sends a numeric index — which would make cards impossible
+        // to confirm in the simulator at all. Treat a list tap without an
+        // index as a tap on the first (focused) item. The H-01 guard above
+        // still applies to sysEvent taps, and hardware behavior is unchanged.
+        onChecksumChoice(0)
       } else {
         const mode = checksumMode()
         if (mode !== 'pending' && mode !== 'pendingNoOriginal' && mode !== 'retry') {

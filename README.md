@@ -65,7 +65,7 @@ the macOS simulator.
 
 ## Demo
 
-_TODO: link to the demo video (≤ 3 min)._
+[Watch the demo video (2:55)](https://drive.google.com/file/d/1Q4iYqp7DYJVn_S2JINTgdIB9rUzA-iz9/view?usp=drivesdk) — real Discord voice through the Even Hub simulator, a Telegram voice-message cut, and English narration. The conversation is in Japanese (the app is bilingual); the glasses UI is shown in English.
 
 ## What existed before the official build start (hackathon declaration)
 
